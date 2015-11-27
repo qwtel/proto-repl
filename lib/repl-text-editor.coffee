@@ -31,6 +31,8 @@ and executes that.\n
 # The path to a default project to use if proto repl is started outside of a leiningen project
 defaultProjectPath = "#{atom.packages.getPackageDirPaths()[0]}/proto-repl/proto-no-proj"
 
+replClojureScript = "#{atom.packages.getPackageDirPaths()[0]}/proto-repl/lib/proto_repl.clj"
+
 module.exports =
 class ReplTextEditor
   # This is set to some string to strip out of the text displayed. It is used to remove code that
@@ -50,8 +52,8 @@ class ReplTextEditor
     # Handles the text editor being closed.
     closingHandler =  =>
       try
-        # I couldn't refer to sendToRepl directly here. I'm not sure why.
-        @process.send event: 'input', text: "(System/exit 0)\n"
+        # I couldn't refer to exitRepl directly here. I'm not sure why.
+        @process.send event: 'input', text: ":exit\n"
       catch error
         console.log("Warning error while closing: " + error)
 
@@ -69,7 +71,6 @@ class ReplTextEditor
       @textEditor.onDidDestroy(closingHandler)
 
       # Set the text editor not to be wrapped.
-      # TODO make this a config option with keyboard short cut and tool bar button
       @textEditor.setSoftWrapped(true)
 
       # Display the help text when the repl opens.
@@ -79,10 +80,11 @@ class ReplTextEditor
       @appendText(";; Loading REPL...\n")
 
     # Start the repl process as a background task
+    leinArgs = "trampoline run -m clojure.main #{replClojureScript}"
     @process = Task.once ReplProcess,
                          path.resolve(projectPath),
                          atom.config.get('proto-repl.leinPath').replace("/lein",""),
-                         atom.config.get('proto-repl.leinArgs').split(" ")
+                         leinArgs.split(" ")
     @attachListeners()
 
   strToBytes: (s)->
@@ -107,8 +109,12 @@ class ReplTextEditor
   onDidExit: (callback)->
     @emitter.on 'proto-repl-text-editor:exit', callback
 
-  sendToRepl: (text)->
-    @process.send event: 'input', text: text + "\n"
+  executeCode: (ns, code)->
+    escapedCode = code.replace(/\\/g,"\\\\").replace(/"/g, "\\\"")
+    @process.send event: 'input', text: "{:ns-to-use #{ns} :code \"#{escapedCode}\"}\n"
+
+  exitRepl: ()->
+    @process.send event: 'input', text: ":exit\n"
 
   clear: ->
     @textEditor.setText("")

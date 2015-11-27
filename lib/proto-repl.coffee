@@ -17,10 +17,6 @@ module.exports = ProtoRepl =
       description: 'The path to the lein executable.'
       type: 'string'
       default: 'lein'
-    leinArgs:
-      description: 'The arguments to be passed to leiningen'
-      type: 'string'
-      default: "trampoline run -m clojure.main"
 
   subscriptions: null
   replTextEditor: null
@@ -120,23 +116,16 @@ module.exports = ProtoRepl =
   clearRepl: ->
     @replTextEditor?.clear()
 
+  quitRepl: ->
+    @replTextEditor?.exitRepl()
+
   executeCode: (code)->
-    @replTextEditor?.sendToRepl(code)
-
-  # Puts the given text in the namespace
-  putTextInNamespace: (text, ns) ->
-    # An alternative that doesn't use text replacement. It has problems if the clojure code is not well formed
-    # "(binding [*ns* (or (find-ns '#{ns}) (find-ns 'user))] (eval '(do #{text})))"
-
-    escaped = text.replace(/\\/g,"\\\\").replace(/"/g, "\\\"")
-    "(binding [*ns* (or (find-ns '#{ns}) (find-ns 'user))] (eval (read-string \"#{escaped}\")))"
+    @replTextEditor?.executeCode("user", code)
 
   executeCodeInNs: (code)->
     if editor = atom.workspace.getActiveTextEditor()
       ns = EditorUtils.findNsDeclaration(editor)
-      if ns
-        code = @putTextInNamespace(code, ns)
-      @executeCode(code)
+      @replTextEditor?.executeCode(ns, code)
 
   executeSelectedText: ->
     if editor = atom.workspace.getActiveTextEditor()
@@ -168,9 +157,6 @@ module.exports = ProtoRepl =
       null
     else
       text
-
-  quitRepl: ->
-    @executeCode("(System/exit 0)")
 
   prettyPrint: ->
     @executeCode("(clojure.pprint/pp)")
